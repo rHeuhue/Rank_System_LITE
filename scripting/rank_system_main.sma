@@ -2,11 +2,11 @@
 
 /* Common include libraries */
 #include <amxmisc>
-#include <fvault>
+#include <time>
 #tryinclude <cromchat>
 
 #define PLUGIN  "Rank System"
-#define VERSION "1.1"
+#define VERSION "1.2"
 #define AUTHOR  "Huehue @ AMXX-BG.INFO"
 #define GAMETRACKER "rank_system"
 
@@ -22,10 +22,28 @@ enum _:ePlayerData
 	NextLevel,
 	IncreaseExperience,
 	ConnectStatus,
-	UserName[MAX_PLAYERS]
+	UserName[MAX_PLAYERS],
+	Connections,
+	Played_Time
 }
 
 new g_iPlayerData[MAX_PLAYERS + 1][ePlayerData]
+
+enum
+{
+	NVAULT = 0,
+	FVAULT,
+	SQL
+}
+
+#include <fvault>
+
+#include <nvault>
+new g_iNVault
+
+#include <sqlx>
+new Handle:g_SqlTuple
+new g_Error[512]
 
 enum
 {
@@ -33,21 +51,22 @@ enum
 	Positive
 }
 
-new const g_szVault[] = "Rank_System_AMXXBG"
-
 new Array:g_aRankName, Array:g_aRankExp
 new iTotalRanks
 
 enum
 {
 	SECTION_SETTINGS = 1,
-	SECTION_RANKS
+	SECTION_RANKS,
+	SECTION_SAVE_SETTINGS
 }
 
 enum _:eSettings
 {
 	Prefix[32],
 	VipFlag[6],
+	SaveType,
+	Float:LoadTime,
 	HudColors[12],
 	Float:HudX,
 	Float:HudY,
@@ -65,19 +84,54 @@ enum _:eSettings
 
 new g_eSettings[eSettings]
 
+enum _:eSave_Settings
+{
+	Host[MAX_NAME_LENGTH],
+	User[MAX_NAME_LENGTH],
+	Pass[MAX_NAME_LENGTH],
+	Db[MAX_NAME_LENGTH],
+	Table[MAX_NAME_LENGTH],
+	NVault[MAX_NAME_LENGTH],
+	FVault[MAX_NAME_LENGTH]
+}
+
+new g_eSave_Settings[eSave_Settings]
+
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR)
 	register_cvar(GAMETRACKER, AUTHOR, FCVAR_SERVER | FCVAR_SPONLY)
 	set_cvar_string(GAMETRACKER, AUTHOR)
 
+	register_dictionary("time.txt")
+
 	register_event("DeathMsg", "eventDeathMsg", "a")
 
 	register_clcmd("amx_reload_file", "Command_Reload_RanksFile", ADMIN_RCON, "- Reload settings and rank file..")
 
+	register_clcmd("say /pinfo", "Show_PlayerInfo")
+	register_clcmd("say_team /pinfo", "Show_PlayerInfo")
+	register_clcmd("say /pt", "Show_PlayerInfo")
+	register_clcmd("say /playtime", "Show_PlayerInfo")
+
 	#if defined _cromchat_included
 	CC_SetPrefix(g_eSettings[Prefix])
 	#endif
+}
+
+public plugin_cfg()
+{
+	switch(g_eSave_Settings[SaveType])
+	{
+		case NVAULT:
+		{
+			g_iNVault = nvault_open(g_eSave_Settings[NVault]) 
+		}
+		case SQL:
+		{
+			set_task(2.0, "RSH_SQL_Initialize")
+		}
+	}
 }
 
 public plugin_precache()
@@ -86,6 +140,22 @@ public plugin_precache()
 	g_aRankExp = ArrayCreate(64, 1)
 	
 	Read_Ranks_File()
+}
+
+public plugin_end()
+{
+	switch(g_eSave_Settings[SaveType])
+	{
+		case NVAULT:
+		{
+			nvault_close(g_iNVault)
+		}
+		case SQL:
+		{
+			if(g_SqlTuple != Empty_Handle)
+				SQL_FreeHandle(g_SqlTuple)
+		}
+	}
 }
 
 public Read_Ranks_File()
@@ -103,7 +173,7 @@ public Read_Ranks_File()
 		
 		if (iFile)
 		{
-			new szNewFile[512]
+			new szNewFile[MAX_MOTD_LENGTH]
 			formatex(szNewFile, charsmax(szNewFile), "[SETTINGS]\
 				^nPREFIX = &x04[&x03Rank System&x04]\
 				^nVIP_FLAG = b\
@@ -119,6 +189,17 @@ public Read_Ranks_File()
 				^nVIP_HEADSHOT_KILL_EXP = 5\
 				^nVIP_GRENADE_KILL_EXP = 6\
 				^nVIP_KNIFE_KILL_EXP = 8\
+				^n^n[SAVE SETTINGS]\
+				^nHOST = YourHost\
+				^nUSER = YourUser\
+				^nPASS = YourPassword\
+				^nDB = YourDb\
+				^nTABLE = RSH_SQLx_AMXXBG\
+				^nNVault = RSH_nVault_AMXXBG\
+				^nFVault = RSH_fVault_AMXXBG\
+				^n^n// Save types are: 0 = nVault | 1 = fVault | 2 = SQL || Requires Map change to load new settings\
+				^nSAVE_TYPE = 0\
+				^nLOAD_TIME = 1.0\
 				^n^n[RANKS]\
 				^n;Rank Name = XP\
 				^nNewbie = 0\
@@ -154,6 +235,8 @@ public Read_Ranks_File()
 					{
 						if (containi(szLineData, "settings") != -1)
 							iSection = SECTION_SETTINGS
+						else if (containi(szLineData, "save") != -1)
+							iSection = SECTION_SAVE_SETTINGS
 						else if (containi(szLineData, "ranks") != -1)
 							iSection = SECTION_RANKS
 					}
@@ -205,6 +288,35 @@ public Read_Ranks_File()
 							else if (equal(szKey, "VIP_KNIFE_KILL_EXP"))
 								g_eSettings[VipKnifeKillExp] = str_to_num(szValue)
 						}
+						case SECTION_SAVE_SETTINGS:
+						{
+							strtok(szLineData, szKey, charsmax(szKey), szValue, charsmax(szValue), '=')
+							trim(szKey)
+							trim(szValue)
+
+							if (szValue[0] == EOS)
+								continue
+
+							if (equal(szKey, "HOST"))
+								copy(g_eSave_Settings[Host], charsmax(g_eSave_Settings[Host]), szValue)
+							else if (equal(szKey, "USER"))
+								copy(g_eSave_Settings[Host], charsmax(g_eSave_Settings[Host]), szValue)
+							else if (equal(szKey, "PASS"))
+								copy(g_eSave_Settings[Pass], charsmax(g_eSave_Settings[Pass]), szValue)
+							else if (equal(szKey, "DB"))
+								copy(g_eSave_Settings[Db], charsmax(g_eSave_Settings[Db]), szValue)
+							else if (equal(szKey, "TABLE"))
+								copy(g_eSave_Settings[Table], charsmax(g_eSave_Settings[Table]), szValue)
+							else if (equal(szKey, "NVault"))
+								copy(g_eSave_Settings[NVault], charsmax(g_eSave_Settings[NVault]), szValue)
+							else if (equal(szKey, "FVault"))
+								copy(g_eSave_Settings[FVault], charsmax(g_eSave_Settings[FVault]), szValue)
+							else if (equal(szKey, "SAVE_TYPE"))
+								g_eSettings[SaveType] = str_to_num(szValue)
+							else if (equal(szKey, "LOAD_TIME"))
+								g_eSettings[LoadTime] = _:str_to_float(szValue)
+
+						}
 						case SECTION_RANKS:
 						{
 							strtok(szLineData, szKey, charsmax(szKey), szValue, charsmax(szValue), '=')
@@ -234,7 +346,7 @@ public client_putinserver(id)
 	arrayset(g_iPlayerData[id], 0, sizeof(g_iPlayerData[]))
 
 	get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
-	set_task(0.1, "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
+	set_task(g_eSettings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
 }
 
 public client_disconnected(id)
@@ -251,16 +363,37 @@ public client_infochanged(id)
 	if (!is_user_connected(id))
 		return PLUGIN_HANDLED
 	
-	static szNames[2][32]
-	get_user_name(id, szNames[0], charsmax(szNames[]))
-	get_user_info(id, "name", szNames[1], charsmax(szNames[]))
-
-	if (!equali(szNames[1], szNames[0]))
+	enum _:eNameData
 	{
-		Save_Data(id, szNames[0])
-		set_task(0.1, "Load_Data", id, szNames[1], sizeof(szNames[]))
-		g_iPlayerData[id][UserName] = szNames[1]
+		Old_Name,
+		New_Name
+	}
+
+	static szNames[eNameData][MAX_NAME_LENGTH]
+	get_user_name(id, szNames[Old_Name], charsmax(szNames[]))
+	get_user_info(id, "name", szNames[New_Name], charsmax(szNames[]))
+
+	if (!equali(szNames[New_Name], szNames[Old_Name]))
+	{
+		Save_Data(id, szNames[Old_Name])
+		set_task(0.1, "Load_Data", id, szNames[New_Name], sizeof(szNames[]))
+		g_iPlayerData[id][UserName] = szNames[New_Name]
 		return PLUGIN_HANDLED
+	}
+	return PLUGIN_HANDLED
+}
+
+public Show_PlayerInfo(id)
+{
+	if (is_user_connected(id))
+	{
+		new szTime[MAX_FMT_LENGTH]
+		get_time_length(id, get_user_total_playtime(id), timeunit_seconds, szTime, charsmax(szTime))
+		#if defined _cromchat_included
+		CC_SendMatched(id, CC_COLOR_GREY, "&x03Player: &x04%s &x03>> [&x01Play Time: &x04%s &x03| &x01Connects: &x04%i&x03]", g_iPlayerData[id][UserName], szTime, g_iPlayerData[id][Connections])
+		#else
+		client_print_color(id, print_team_grey, "^4* ^3Player: ^4%s ^3>> [^1Play Time: ^4%s ^3| ^1Connects: ^4%i^3]", g_iPlayerData[id][UserName], szTime, g_iPlayerData[id][Connections])
+		#endif
 	}
 	return PLUGIN_HANDLED
 }
@@ -309,7 +442,7 @@ public CheckRank(id, iType)
 				#if defined _cromchat_included
 				CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s&x03 has lost &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
 				#else
-				client_print(0, print_chat, "* Player %s has lost Level %i - %s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
+				client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has lost ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
 				#endif
 			}
 		}
@@ -331,7 +464,7 @@ public CheckRank(id, iType)
 				#if defined _cromchat_included
 				CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s &x03has achieved &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
 				#else
-				client_print(0, print_chat, "* Player %s has achieved Level %i - %s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
+				client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has achieved ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
 				#endif
 			}
 		}
@@ -382,40 +515,251 @@ public eventDeathMsg()
 /* =============================================
 	Load & Save
 ============================================= */
-public Load_Data(szName[], id)
+public RSH_SQL_Initialize()
 {
-	if(!is_user_connected(id))
-		return
+	new ErrorCode
+	/*new Host[32], User[32], Pass[32], Db[32]
+	get_cvar_string("amx_sql_host", Host, charsmax(Host))
+	get_cvar_string("amx_sql_user", User, charsmax(User))
+	get_cvar_string("amx_sql_pass", Pass, charsmax(Pass))
+	get_cvar_string("amx_sql_db", Db, charsmax(Db))
 	
-	new szData[64]
-			
-	if(fvault_get_data(g_szVault, szName, szData, charsmax(szData)))
-	{
-		replace_all(szData, charsmax(szData), "#", " ")
-		
-		new szExp[10], szLevel[10]
-		parse(szData, szExp, charsmax(szExp), szLevel, charsmax(szLevel))
+	g_SqlTuple = SQL_MakeDbTuple(Host, User, Pass, Db)*/
 
-		g_iPlayerData[id][Experience] = str_to_num(szExp)
-		g_iPlayerData[id][Level] = str_to_num(szLevel)
-		g_iPlayerData[id][NextLevel] = g_iPlayerData[id][Level]
-		g_iPlayerData[id][NextLevel]++
-	} 
-	else 
+	g_SqlTuple = SQL_MakeDbTuple(g_eSave_Settings[Host], g_eSave_Settings[User], g_eSave_Settings[Pass], g_eSave_Settings[Db])
+	
+	new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
+	
+	if(SqlConnection == Empty_Handle)
+		set_fail_state(g_Error)
+
+	new Handle:Queries = SQL_PrepareQuery(SqlConnection, "CREATE TABLE IF NOT EXISTS `%s`\
+	(`Name` VARCHAR(32) NOT NULL,\
+	`Experience` INT(10) NOT NULL,\
+	`Level` INT(10) NOT NULL,\
+	`Played_Time` INT(10) NOT NULL,\
+	`Connections` INT(10) NOT NULL,\
+	PRIMARY KEY (Name));", g_eSave_Settings[Table])
+	
+	if(!SQL_Execute(Queries))
 	{
-		g_iPlayerData[id][Experience] = 0
-		g_iPlayerData[id][Level] = 0
-		g_iPlayerData[id][NextLevel] = 1
+		SQL_QueryError(Queries, g_Error, charsmax(g_Error))
+		set_fail_state(g_Error)
 	}
+	
+	SQL_FreeHandle(Queries)
+	SQL_FreeHandle(SqlConnection)
+}
 
-	g_iPlayerData[id][ConnectStatus] = true
+public QueryHandler(FailState, Handle:Query, Error[], Errcode, Data[], DataSize)
+{
+	switch(FailState)
+	{
+		case -2:
+		{
+			log_amx("[SQL Error] Failed to connect (%d): %s", Errcode, Error);
+		}
+		case -1:
+		{
+			log_amx("[SQL Error] (%d): %s", Errcode, Error);
+		}
+	}
+	return PLUGIN_HANDLED
 }
 
 public Save_Data(id, szName[])
 {
-	new szData[64]
-	formatex(szData, charsmax(szData), "%i#%i", g_iPlayerData[id][Experience], g_iPlayerData[id][Level])
-	fvault_set_data(g_szVault, szName, szData)
+	static szData[MAX_FMT_LENGTH], szTemp[MAX_FMT_LENGTH * 2]
+	switch(g_eSave_Settings[SaveType])
+	{
+		case NVAULT:
+		{
+			formatex(szData, charsmax(szData), "%i#%i#%i#%i", g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections])
+			nvault_set(g_iNVault, szName, szData)
+		}
+		case FVAULT:
+		{
+			formatex(szData, charsmax(szData), "%i#%i#%i#%i", g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections])
+			fvault_set_data(g_eSave_Settings[FVault], szName, szData)
+		}
+		case SQL:
+		{
+			format(szTemp, charsmax(szTemp), "UPDATE `%s` SET `Experience`='%i',`Level`='%i',`Played_Time`='%i',`Connections`='%i' WHERE `Name`='%s';", g_eSave_Settings[Table], g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections], szName)
+			SQL_ThreadQuery(g_SqlTuple, "QueryHandler", szTemp)
+		}
+	}
+}
+
+public Load_Data(szName[], id)
+{
+	if (!is_user_connected(id))
+		return
+	
+	static szData[MAX_FMT_LENGTH]
+	
+	switch(g_eSave_Settings[SaveType])
+	{
+		case NVAULT:
+		{
+			new iTimeStamp
+			if (nvault_lookup(g_iNVault, szName, szData, charsmax(szData), iTimeStamp))
+			{
+				parse_loaded_data(id, szData, charsmax(szData))
+			}
+			else
+			{
+				register_new_player(id)
+			}
+		}
+		case FVAULT:
+		{
+			if(fvault_get_data(g_eSave_Settings[FVault], szName, szData, charsmax(szData)))
+			{
+				parse_loaded_data(id, szData, charsmax(szData))
+			} 
+			else 
+			{
+				register_new_player(id)
+			}
+		}
+		case SQL:
+		{
+			new ErrorCode
+			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
+			
+			SQL_QuoteString(SqlConnection, szName, MAX_NAME_LENGTH, szName)
+			
+			if (SqlConnection == Empty_Handle)
+			{
+				log_amx(g_Error)
+				return
+			}
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, "SELECT * FROM %s WHERE Name = '%s';", g_eSave_Settings[Table], szName)
+			
+			if (!SQL_Execute(Query))
+			{
+				SQL_QueryError(Query, g_Error, charsmax(g_Error))
+				log_amx(g_Error)
+				return
+			}
+			if (SQL_NumResults(Query) > 0)
+			{
+				parse_loaded_data(id, "", 0)
+			}
+			else
+			{
+				register_new_player(id)
+			}
+			SQL_FreeHandle(Query)
+			SQL_FreeHandle(SqlConnection)
+		}
+	}
+	g_iPlayerData[id][ConnectStatus] = true
+}
+
+public parse_loaded_data(id, szData[], iLen)
+{
+	switch(g_eSave_Settings[SaveType])
+	{
+		case NVAULT..FVAULT:
+		{
+			replace_all(szData, iLen, "#", " ")
+
+			new szExp[10], szLevel[10], szTime[32], szConnections[10]
+			parse(szData, szExp, charsmax(szExp), szLevel, charsmax(szLevel), szTime, charsmax(szTime), szConnections, charsmax(szConnections))
+
+			g_iPlayerData[id][Experience] = str_to_num(szExp)
+			g_iPlayerData[id][Level] = str_to_num(szLevel)
+			g_iPlayerData[id][NextLevel] = g_iPlayerData[id][Level]
+			g_iPlayerData[id][NextLevel]++
+
+			g_iPlayerData[id][Played_Time] = str_to_num(szTime)
+			g_iPlayerData[id][Connections] = str_to_num(szConnections)
+			g_iPlayerData[id][Connections]++
+		}
+		case SQL:
+		{
+			new ErrorCode
+			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
+			
+			SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+			
+			if (SqlConnection == Empty_Handle)
+			{
+				log_amx(g_Error)
+				return 
+			}
+			
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, "SELECT Experience,Level,Played_Time,Connections FROM %s WHERE Name = '%s';", g_eSave_Settings[Table], g_iPlayerData[id][UserName])
+			
+			if (!SQL_Execute(Query))
+			{
+				SQL_QueryError(Query, g_Error, charsmax(g_Error))
+				log_amx(g_Error)
+			}
+			
+			if (SQL_NumResults(Query) > 0)
+			{
+				g_iPlayerData[id][Experience] = SQL_ReadResult(Query, 0)
+				g_iPlayerData[id][Level] = SQL_ReadResult(Query, 1)
+				g_iPlayerData[id][NextLevel] = g_iPlayerData[id][Level]
+				g_iPlayerData[id][NextLevel]++
+
+				g_iPlayerData[id][Played_Time] = SQL_ReadResult(Query, 2)
+				g_iPlayerData[id][Connections] = SQL_ReadResult(Query, 3)
+				g_iPlayerData[id][Connections]++
+			}
+			SQL_FreeHandle(Query)
+			SQL_FreeHandle(SqlConnection)
+		}
+	}
+}
+
+public register_new_player(id)
+{
+	switch(g_eSettings[SaveType])
+	{
+		case NVAULT..FVAULT:
+		{
+			g_iPlayerData[id][Experience] = 0
+			g_iPlayerData[id][Level] = 0
+			g_iPlayerData[id][NextLevel] = 1
+
+			g_iPlayerData[id][Played_Time] = 0
+			g_iPlayerData[id][Connections] = 1
+		}
+		case SQL:
+		{
+			new ErrorCode
+			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
+			
+			SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+			
+			if(SqlConnection == Empty_Handle)
+			{
+				log_amx(g_Error)
+				return 
+			}
+			
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, "INSERT INTO %s (`Name`,`Experience`,`Level`,`Played_Time`,`Connections`) VALUES ('%s','0','0','0','1');", g_eSave_Settings[Table], g_iPlayerData[id][UserName])
+			
+			if(!SQL_Execute(Query))
+			{
+				SQL_QueryError(Query, g_Error, charsmax(g_Error))
+				log_amx(g_Error)
+			}
+			
+			SQL_FreeHandle(Query)
+			SQL_FreeHandle(SqlConnection)
+			
+			g_iPlayerData[id][Experience] = 0
+			g_iPlayerData[id][Level] = 0
+			g_iPlayerData[id][NextLevel] = 1
+			
+			g_iPlayerData[id][Played_Time] = 0
+			g_iPlayerData[id][Connections] = 1
+		}
+	}
 }
 
 
@@ -446,6 +790,10 @@ public plugin_natives()
 	register_native("get_hud_position_x", "native_get_hud_position_x")
 	register_native("get_hud_position_y", "native_get_hud_position_y")
 	register_native("get_hud_effect", "native_get_hud_effect")
+
+	register_native("get_user_connects", "native_get_user_connects")
+	register_native("get_user_playtime", "native_get_user_playtime")
+	register_native("get_user_sz_playtime", "native_get_user_sz_playetime")
 }
 
 public native_get_user_level(iPlugin, iParams)
@@ -654,4 +1002,43 @@ public Float:native_get_hud_position_y(iPlugin, iParams)
 public native_get_hud_effect(iPlugin, iParams)
 {
 	return g_eSettings[HudEffect]
+}
+
+public native_get_user_connects(iPlugin, iParams)
+{
+	new id = get_param(1)
+
+	if (!is_user_connected(id))
+		return -1
+
+	return g_iPlayerData[id][Connections]
+}
+
+public native_get_user_playtime(iPlugin, iParams)
+{
+	new id = get_param(1)
+
+	if (!is_user_connected(id))
+		return -1
+
+	return get_user_total_playtime(id)
+}
+
+public native_get_user_sz_playetime(iPlugin, iParams)
+{
+	new id = get_param(1)
+	
+	if (!is_user_connected(id))
+		return false
+
+	new szTime[MAX_FMT_LENGTH]
+	get_time_length_ex(get_user_total_playtime(id), timeunit_seconds, szTime, charsmax(szTime))
+
+	set_string(2, szTime, get_param(3))
+	return true
+}
+
+stock get_user_total_playtime(id)
+{
+	return g_iPlayerData[id][Played_Time] + get_user_time(id)
 }

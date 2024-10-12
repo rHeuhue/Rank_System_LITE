@@ -37,9 +37,10 @@ public HudEntity(iEnt)
 	{
 		id = iPlayers[i]
 
-		new szRankName[2][64], szHudMessage[128]
+		new szRankName[2][64], szHudMessage[128], szTime[MAX_FMT_LENGTH]
 		get_user_rank_name(id, szRankName[0], charsmax(szRankName[]))
 		get_user_next_rank_name(id, szRankName[1], charsmax(szRankName[]))
+		get_user_sz_playtime(id, szTime, charsmax(szTime))
 				
 		iLen = formatex(szHudMessage, charsmax(szHudMessage), "Rank: %s^n", szRankName[0])
 				
@@ -53,6 +54,8 @@ public HudEntity(iEnt)
 			iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Experience: %i/%i^nNext Rank: %s",
 				get_user_exp(id), get_user_next_exp(id), szRankName[1])
 		}
+
+		iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "^nPlay Time: %s", szTime)
 
 		static szColors[12], szRed[6], szGreen[6], szBlue[6], iRed, iGreen, iBlue
 		get_hud_colors(szColors, charsmax(szColors))

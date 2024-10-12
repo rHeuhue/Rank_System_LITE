@@ -203,3 +203,32 @@ native Float:get_hud_position_y()
  * @return			Internal Effect [ 0 = Nothing | 1 = Blink ]
  */
 native get_hud_effect()
+
+
+/**
+ * Returns a player's current total connects value.
+ *
+ * @param id		Player index.
+ * @return			Internal connections, or -1 if not yet connected.
+ */
+native get_user_connects(id)
+
+/**
+ * Returns a player's current total playtime value.
+ *
+ * @param id		Player index.
+ * @return			Internal playtime, or -1 if not yet connected.
+ */
+native get_user_playtime(id)
+
+/**
+ * Returns a player's play time in string.
+ *
+ * @param id		Player index.
+ * @param szTime	String
+ * @param iLen		String length
+ * @return			Internal play time string, or nothing if not yet connected.
+ *
+ * Example: get_user_sz_playtime(id, szTime, charsmax(szTime))
+ */
+native get_user_sz_playtime(id, szTime[], iLen)
