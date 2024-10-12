@@ -65,8 +65,6 @@ enum _:eSettings
 {
 	Prefix[32],
 	VipFlag[6],
-	SaveType,
-	Float:LoadTime,
 	HudColors[12],
 	Float:HudX,
 	Float:HudY,
@@ -92,7 +90,9 @@ enum _:eSave_Settings
 	Db[MAX_NAME_LENGTH],
 	Table[MAX_NAME_LENGTH],
 	NVault[MAX_NAME_LENGTH],
-	FVault[MAX_NAME_LENGTH]
+	FVault[MAX_NAME_LENGTH],
+	SaveType,
+	Float:LoadTime
 }
 
 new g_eSave_Settings[eSave_Settings]
@@ -312,9 +312,9 @@ public Read_Ranks_File()
 							else if (equal(szKey, "FVault"))
 								copy(g_eSave_Settings[FVault], charsmax(g_eSave_Settings[FVault]), szValue)
 							else if (equal(szKey, "SAVE_TYPE"))
-								g_eSettings[SaveType] = str_to_num(szValue)
+								g_eSave_Settings[SaveType] = str_to_num(szValue)
 							else if (equal(szKey, "LOAD_TIME"))
-								g_eSettings[LoadTime] = _:str_to_float(szValue)
+								g_eSave_Settings[LoadTime] = _:str_to_float(szValue)
 
 						}
 						case SECTION_RANKS:
@@ -346,7 +346,7 @@ public client_putinserver(id)
 	arrayset(g_iPlayerData[id], 0, sizeof(g_iPlayerData[]))
 
 	get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
-	set_task(g_eSettings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
+	set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
 }
 
 public client_disconnected(id)
@@ -717,7 +717,7 @@ public parse_loaded_data(id, szData[], iLen)
 
 public register_new_player(id)
 {
-	switch(g_eSettings[SaveType])
+	switch(g_eSave_Settings[SaveType])
 	{
 		case NVAULT..FVAULT:
 		{
