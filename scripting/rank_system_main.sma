@@ -518,14 +518,6 @@ public eventDeathMsg()
 public RSH_SQL_Initialize()
 {
 	new ErrorCode
-	/*new Host[32], User[32], Pass[32], Db[32]
-	get_cvar_string("amx_sql_host", Host, charsmax(Host))
-	get_cvar_string("amx_sql_user", User, charsmax(User))
-	get_cvar_string("amx_sql_pass", Pass, charsmax(Pass))
-	get_cvar_string("amx_sql_db", Db, charsmax(Db))
-	
-	g_SqlTuple = SQL_MakeDbTuple(Host, User, Pass, Db)*/
-
 	g_SqlTuple = SQL_MakeDbTuple(g_eSave_Settings[Host], g_eSave_Settings[User], g_eSave_Settings[Pass], g_eSave_Settings[Db])
 	
 	new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
