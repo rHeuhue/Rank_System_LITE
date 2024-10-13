@@ -122,7 +122,7 @@ public player_set_menu_handler(id, iMenu, Item)
 		#if defined _cromchat_included
 		CC_SendMatched(id, CC_COLOR_GREY, "&x03The player you chose is not in the server.")
 		#else
-		client_print(id, print_chat, "* The player you chose is not in the server.")
+		client_print_color(id, print_team_grey, "^4* ^3The player you chose is not in the server.")
 		#endif
 		return PLUGIN_HANDLED
 	}
@@ -133,7 +133,7 @@ public player_set_menu_handler(id, iMenu, Item)
 	#if defined _cromchat_included
 	CC_SendMatched(id, CC_COLOR_GREY, "&x03Player &x04%s &x03is &x04Level %i %s &x03with &x04%i Experience&x03.", iName, get_user_level(g_iPlayer[id]), szRankName, get_user_exp(g_iPlayer[id]))
 	#else
-	client_print(id, print_chat, "* Player %s is Level %i %s with %i Experience.", iName, get_user_level(g_iPlayer[id]), szRankName, get_user_exp(g_iPlayer[id]))
+	client_print_color(id, print_team_grey, "^4* ^3Player ^4%s ^3is ^4Level %i %s ^3with ^4%i Experience^3.", iName, get_user_level(g_iPlayer[id]), szRankName, get_user_exp(g_iPlayer[id]))
 	#endif
 
 	switch(g_iMenuType[id])
@@ -159,7 +159,7 @@ public Command_XP_Amount(id, level, cid)
 		#if defined _cromchat_included
 		CC_SendMatched(id, CC_COLOR_GREY, "&x03The player you chose is not in the server.")
 		#else
-		client_print(id, print_chat, "* The player you chose is not in the server.")
+		client_print_color(id, print_team_grey, "^4* ^3The player you chose is not in the server.")
 		#endif
 		return PLUGIN_HANDLED
 	}
@@ -181,7 +181,7 @@ public Command_XP_Amount(id, level, cid)
 			#if defined _cromchat_included
 			CC_SendMatched(0, CC_COLOR_GREY, "&x03%s&x01 gave &x04%i XP &x01to &x03%s&x01.", szNames[0], iXP, szNames[1])
 			#else
-			client_print(0, print_chat, "* %s gave %i XP to %s.", szNames[0], iXP, szNames[1])
+			client_print_color(0, print_team_grey, "^4* ^3%s ^1gave ^4%i XP ^1to ^3%s^1.", szNames[0], iXP, szNames[1])
 			#endif
 		}
 		case 2:
@@ -190,7 +190,7 @@ public Command_XP_Amount(id, level, cid)
 			#if defined _cromchat_included
 			CC_SendMatched(0, CC_COLOR_GREY, "&x03%s&x01 took &x04%i XP &x01from &x03%s&x01.", szNames[0], iXP, szNames[1])
 			#else
-			client_print(0, print_chat, "* %s took %i XP from %s.", szNames[0], iXP, szNames[1])
+			client_print_color(0, print_team_grey, "^4* ^3%s ^1took ^4%i XP ^1from ^3%s^1.", szNames[0], iXP, szNames[1])
 			#endif
 		}
 	}
@@ -253,7 +253,7 @@ public set_rank_handler(id, iMenu, Item)
 		#if defined _cromchat_included
 		CC_SendMatched(0, CC_COLOR_GREY, "&x03%s&x01 set &x04Level %i %s &x01to &x03%s&x01.", szNames[0], iLevel, szRankName, szNames[1])
 		#else
-		client_print(0, print_chat, "* %s set Level %i %s to %s.", szNames[0], iLevel, szRankName, szNames[1])
+		client_print_color(0, print_team_grey, "^4* ^3%s ^1set ^4Level %i %s ^1to %s^1.", szNames[0], iLevel, szRankName, szNames[1])
 		#endif
 	}
 	
@@ -278,7 +278,7 @@ public Command_Set_Level(id, level, cid)
 		#if defined _cromchat_included
 		CC_SendMatched(id, CC_COLOR_GREY, "&x03The player you chose is not in the server.")
 		#else
-		client_print(id, print_chat, "* The player you chose is not in the server.")
+		client_print_color(id, print_team_grey, "^4* ^3The player you chose is not in the server.")
 		#endif
 		return PLUGIN_HANDLED
 	}
@@ -293,7 +293,7 @@ public Command_Set_Level(id, level, cid)
 		#if defined _cromchat_included
 		CC_SendMatched(id, CC_COLOR_GREY, "&x03You can set level in between&x04 0 &x03and &x04%i &x03only!", get_total_ranks())
 		#else
-		client_print(id, print_chat, "* You can set level in between 0 and %i only!")
+		client_print_color(id, print_team_grey, "^4* ^3You can set level in between^4 0 ^3and^4 %i ^3only!")
 		#endif
 
 		PlayerSetMenu(id, 4)
@@ -312,7 +312,7 @@ public Command_Set_Level(id, level, cid)
 	#if defined _cromchat_included
 	CC_SendMatched(0, CC_COLOR_GREY, "&x03%s &x01set &x04Level %i %s &x01to &x03%s", szNames[0], iLevel, szRankName, szNames[1])
 	#else
-	client_print(0, print_chat, "* %s set Level %i %s to %s", szNames[0], iLevel, szRankName, szNames[1])
+	client_print_color(0, print_team_grey, "^4* ^3%s ^1set ^4Level %i %s ^1to ^3%s", szNames[0], iLevel, szRankName, szNames[1])
 	#endif
 
 	g_iPlayer[id] = 0

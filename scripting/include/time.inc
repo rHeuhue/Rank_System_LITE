@@ -41,11 +41,11 @@ enum
  *
  * @note You must add register_dictionary("time.txt") in plugin_init()
  *
- * @param id    		The player whose language the length should be translated to
- * @param unitCnt		The number of time units you want translated into verbose text
- * @param type			The type of unit (i.e. seconds, minutes, hours, days, weeks, months, years) that you are passing in
- * @param output		The variable you want the verbose text to be placed in
- * @param outputLen		The length of the output variable
+ * @param id            The player whose language the length should be translated to
+ * @param unitCnt       The number of time units you want translated into verbose text
+ * @param type          The type of unit (i.e. seconds, minutes, hours, days, weeks, months, years) that you are passing in
+ * @param output        The variable you want the verbose text to be placed in
+ * @param outputLen     The length of the output variable
  *
  * @noreturn
  */
@@ -169,8 +169,13 @@ stock get_time_length_ex(unitCnt, type, output[], outputLen)
             format(timeElement[++maxElementIdx], charsmax(timeElement[]), "%i", hourCnt);
         if (minuteCnt > 0)
             format(timeElement[++maxElementIdx], charsmax(timeElement[]), "%i", minuteCnt);
-        if (secondCnt > 0)
-            format(timeElement[++maxElementIdx], charsmax(timeElement[]), "%i", secondCnt);
+        if (secondCnt >= 0)
+        {
+            if (secondCnt == 0)
+                format(timeElement[++maxElementIdx], charsmax(timeElement[]), "00");
+            else
+                format(timeElement[++maxElementIdx], charsmax(timeElement[]), "%s%i", secondCnt < 10 ? "0" : "", secondCnt);
+        }
 
         switch(maxElementIdx)
         {

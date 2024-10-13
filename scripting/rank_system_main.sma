@@ -379,12 +379,12 @@ public Read_Ranks_File()
 public client_putinserver(id)
 {
 	arrayset(g_iPlayerData[id], 0, sizeof(g_iPlayerData[]))
+	get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
 
 	switch (g_eSave_Settings[SaveByWhat])
 	{
 		case NAME:
 		{
-			get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
 			set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
 		}
 		case STEAMID:
@@ -416,7 +416,7 @@ public client_disconnected(id)
 
 public client_infochanged(id)
 {
-	if (!is_user_connected(id) || g_eSave_Settings[SaveByWhat] != NAME)
+	if (!is_user_connected(id))
 		return PLUGIN_HANDLED
 	
 	enum _:eNameData
@@ -431,8 +431,11 @@ public client_infochanged(id)
 
 	if (!equali(szNames[New_Name], szNames[Old_Name]))
 	{
-		Save_Data(id, szNames[Old_Name])
-		set_task(0.1, "Load_Data", id, szNames[New_Name], sizeof(szNames[]))
+		if (g_eSave_Settings[SaveByWhat] == NAME)
+		{
+			Save_Data(id, szNames[Old_Name])
+			set_task(0.1, "Load_Data", id, szNames[New_Name], sizeof(szNames[]))
+		}
 		g_iPlayerData[id][UserName] = szNames[New_Name]
 		return PLUGIN_HANDLED
 	}
@@ -443,11 +446,14 @@ public Show_PlayerInfo(id)
 {
 	if (is_user_connected(id))
 	{
-		new szTime[MAX_FMT_LENGTH]
+		new szTime[MAX_FMT_LENGTH], szRankName[64]
+		ArrayGetString(g_aRankName, g_iPlayerData[id][Level], szRankName, charsmax(szRankName))
 		get_time_length(id, get_user_total_playtime(id), timeunit_seconds, szTime, charsmax(szTime))
 		#if defined _cromchat_included
+		CC_SendMatched(id, CC_COLOR_GREY, "&x03Player: &x04%s &x03>> [&x01Level: &x04%i &x03| &x01Experience: &x04%i &x03| &x01Rank: &x04%s&x03]", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], g_iPlayerData[id][Experience], szRankName)
 		CC_SendMatched(id, CC_COLOR_GREY, "&x03Player: &x04%s &x03>> [&x01Play Time: &x04%s &x03| &x01Connects: &x04%i&x03]", g_iPlayerData[id][UserName], szTime, g_iPlayerData[id][Connections])
 		#else
+		client_print_color(id, print_team_grey, "^4* ^3Player: ^4%s ^3>> [^1Level: ^4%i ^3| ^1Experience: ^4%i ^3| ^1Rank: ^4%s^3]", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], g_iPlayerData[id][Experience], szRankName)
 		client_print_color(id, print_team_grey, "^4* ^3Player: ^4%s ^3>> [^1Play Time: ^4%s ^3| ^1Connects: ^4%i^3]", g_iPlayerData[id][UserName], szTime, g_iPlayerData[id][Connections])
 		#endif
 	}
@@ -467,7 +473,7 @@ public Command_Reload_RanksFile(id, level, cid)
 	return PLUGIN_HANDLED
 }
 
-public CheckRank(id, iType)
+public CheckRank(id, iType, bool:bSendMessage)
 {
 	if(g_iPlayerData[id][Level] <= 0)
 	{
@@ -495,11 +501,14 @@ public CheckRank(id, iType)
 				new szRankName[64]
 				ArrayGetString(g_aRankName, g_iPlayerData[id][NextLevel], szRankName, charsmax(szRankName))
 
-				#if defined _cromchat_included
-				CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s&x03 has lost &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
-				#else
-				client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has lost ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
-				#endif
+				if (bSendMessage)
+				{
+					#if defined _cromchat_included
+					CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s&x03 has lost &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
+					#else
+					client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has lost ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
+					#endif
+				}
 			}
 		}
 		case Positive:
@@ -517,11 +526,14 @@ public CheckRank(id, iType)
 				new szRankName[64]
 				ArrayGetString(g_aRankName, g_iPlayerData[id][Level], szRankName, charsmax(szRankName))
 				
-				#if defined _cromchat_included
-				CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s &x03has achieved &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
-				#else
-				client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has achieved ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
-				#endif
+				if (bSendMessage)
+				{
+					#if defined _cromchat_included
+					CC_SendMatched(0, CC_COLOR_GREY, "&x03Player &x04%s &x03has achieved &x04Level %i &x03- &x04%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
+					#else
+					client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has achieved ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
+					#endif
+				}
 			}
 		}
 	}
@@ -564,7 +576,7 @@ public eventDeathMsg()
 
 		g_iPlayerData[iKiller][Experience] += g_iPlayerData[iKiller][IncreaseExperience]
 
-		CheckRank(iKiller, Positive)
+		CheckRank(iKiller, Positive, true)
 	}
 }
 
@@ -728,6 +740,8 @@ public parse_loaded_data(id, szData[], iLen)
 			g_iPlayerData[id][Played_Time] = str_to_num(szTime)
 			g_iPlayerData[id][Connections] = str_to_num(szConnections)
 			g_iPlayerData[id][Connections]++
+
+			CheckRank(id, Positive, false)
 		}
 		case SQL:
 		{
@@ -895,12 +909,12 @@ public native_set_user_level(iPlugin, iParams)
 	if (g_iPlayerData[id][Level] < iLevel)
 	{
 		g_iPlayerData[id][Level] = iLevel
-		CheckRank(id, Positive)
+		CheckRank(id, Positive, true)
 	}
 	else
 	{
 		g_iPlayerData[id][Level] = iLevel
-		CheckRank(id, Negative)
+		CheckRank(id, Negative, true)
 	}
 	return true
 	
@@ -924,12 +938,12 @@ public native_set_user_exp(iPlugin, iParams)
 	if (g_iPlayerData[id][Experience] < iExp)
 	{
 		g_iPlayerData[id][Experience] = iExp
-		CheckRank(id, Positive)
+		CheckRank(id, Positive, true)
 	}
 	else
 	{
 		g_iPlayerData[id][Experience] = iExp
-		CheckRank(id, Negative)
+		CheckRank(id, Negative, true)
 	}
 	return true
 	
@@ -1027,7 +1041,7 @@ public native_update_rank_info(iPlugin, iParams)
 	if (!is_user_connected(id))
 		return false
 
-	CheckRank(id, iType)
+	CheckRank(id, iType, true)
 	return true
 }
 
