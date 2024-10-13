@@ -6,7 +6,7 @@
 #tryinclude <cromchat>
 
 #define PLUGIN  "Rank System"
-#define VERSION "1.2"
+#define VERSION "1.3"
 #define AUTHOR  "Huehue @ AMXX-BG.INFO"
 #define GAMETRACKER "rank_system"
 
@@ -23,6 +23,8 @@ enum _:ePlayerData
 	IncreaseExperience,
 	ConnectStatus,
 	UserName[MAX_PLAYERS],
+	UserAuthID[MAX_AUTHID_LENGTH],
+	UserIP[MAX_IP_LENGTH],
 	Connections,
 	Played_Time
 }
@@ -34,6 +36,13 @@ enum
 	NVAULT = 0,
 	FVAULT,
 	SQL
+}
+
+enum
+{
+	NAME = 0,
+	STEAMID,
+	IP
 }
 
 #include <fvault>
@@ -91,8 +100,11 @@ enum _:eSave_Settings
 	Table[MAX_NAME_LENGTH],
 	NVault[MAX_NAME_LENGTH],
 	FVault[MAX_NAME_LENGTH],
+	szSaveType[MAX_NAME_LENGTH],
 	SaveType,
-	Float:LoadTime
+	Float:LoadTime,
+	SaveBy[MAX_NAME_LENGTH],
+	SaveByWhat
 }
 
 new g_eSave_Settings[eSave_Settings]
@@ -125,7 +137,7 @@ public plugin_cfg()
 	{
 		case NVAULT:
 		{
-			g_iNVault = nvault_open(g_eSave_Settings[NVault]) 
+			g_iNVault = nvault_open(g_eSave_Settings[NVault])
 		}
 		case SQL:
 		{
@@ -189,7 +201,7 @@ public Read_Ranks_File()
 				^nVIP_HEADSHOT_KILL_EXP = 5\
 				^nVIP_GRENADE_KILL_EXP = 6\
 				^nVIP_KNIFE_KILL_EXP = 8\
-				^n^n[SAVE SETTINGS]\
+				^n^n[SAVE OPTIONS]\
 				^nHOST = YourHost\
 				^nUSER = YourUser\
 				^nPASS = YourPassword\
@@ -197,9 +209,11 @@ public Read_Ranks_File()
 				^nTABLE = RSH_SQLx_AMXXBG\
 				^nNVault = RSH_nVault_AMXXBG\
 				^nFVault = RSH_fVault_AMXXBG\
-				^n^n// Save types are: 0 = nVault | 1 = fVault | 2 = SQL || Requires Map change to load new settings\
+				^n^n// Save types are: nVault | fVault | SQL || Requires Map change to load new settings\
 				^nSAVE_TYPE = 0\
 				^nLOAD_TIME = 1.0\
+				^n// Save types are: NAME | STEAMID | IP\
+				^nSAVE_BY = NAME\
 				^n^n[RANKS]\
 				^n;Rank Name = XP\
 				^nNewbie = 0\
@@ -300,7 +314,7 @@ public Read_Ranks_File()
 							if (equal(szKey, "HOST"))
 								copy(g_eSave_Settings[Host], charsmax(g_eSave_Settings[Host]), szValue)
 							else if (equal(szKey, "USER"))
-								copy(g_eSave_Settings[Host], charsmax(g_eSave_Settings[Host]), szValue)
+								copy(g_eSave_Settings[User], charsmax(g_eSave_Settings[User]), szValue)
 							else if (equal(szKey, "PASS"))
 								copy(g_eSave_Settings[Pass], charsmax(g_eSave_Settings[Pass]), szValue)
 							else if (equal(szKey, "DB"))
@@ -312,9 +326,29 @@ public Read_Ranks_File()
 							else if (equal(szKey, "FVault"))
 								copy(g_eSave_Settings[FVault], charsmax(g_eSave_Settings[FVault]), szValue)
 							else if (equal(szKey, "SAVE_TYPE"))
-								g_eSave_Settings[SaveType] = str_to_num(szValue)
+							{
+								copy(g_eSave_Settings[szSaveType], charsmax(g_eSave_Settings[szSaveType]), szValue)
+
+								if (equali(g_eSave_Settings[szSaveType], "nvault"))
+									g_eSave_Settings[SaveType] = NVAULT
+								else if (equali(g_eSave_Settings[szSaveType], "fvault"))
+									g_eSave_Settings[SaveType] = FVAULT
+								else if (equali(g_eSave_Settings[szSaveType], "sql"))
+									g_eSave_Settings[SaveType] = SQL
+							}
 							else if (equal(szKey, "LOAD_TIME"))
 								g_eSave_Settings[LoadTime] = _:str_to_float(szValue)
+							else if (equal(szKey, "SAVE_BY"))
+							{
+								copy(g_eSave_Settings[SaveBy], charsmax(g_eSave_Settings[SaveBy]), szValue)
+
+								if (equali(g_eSave_Settings[SaveBy], "NAME"))
+									g_eSave_Settings[SaveByWhat] = NAME
+								else if (equali(g_eSave_Settings[SaveBy], "STEAMID") || equali(g_eSave_Settings[SaveBy], "AUTHID") || equali(g_eSave_Settings[SaveBy], "STEAM"))
+									g_eSave_Settings[SaveByWhat] = STEAMID
+								else if (equali(g_eSave_Settings[SaveBy], "IP"))
+									g_eSave_Settings[SaveByWhat] = IP
+							}
 
 						}
 						case SECTION_RANKS:
@@ -345,22 +379,43 @@ public client_putinserver(id)
 {
 	arrayset(g_iPlayerData[id], 0, sizeof(g_iPlayerData[]))
 
-	get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
-	set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
+	switch (g_eSave_Settings[SaveByWhat])
+	{
+		case NAME:
+		{
+			get_user_name(id, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]))
+			set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserName], sizeof(g_iPlayerData[][UserName]))
+		}
+		case STEAMID:
+		{
+			get_user_authid(id, g_iPlayerData[id][UserAuthID], charsmax(g_iPlayerData[][UserAuthID]))
+			set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserAuthID], sizeof(g_iPlayerData[][UserAuthID]))
+		}
+		case IP:
+		{
+			get_user_ip(id, g_iPlayerData[id][UserIP], charsmax(g_iPlayerData[][UserIP]), 1)
+			set_task(g_eSave_Settings[LoadTime], "Load_Data", id, g_iPlayerData[id][UserIP], sizeof(g_iPlayerData[][UserIP]))
+		}
+	}
 }
 
 public client_disconnected(id)
 {
 	if (g_iPlayerData[id][ConnectStatus])
 	{
-		Save_Data(id, g_iPlayerData[id][UserName])
+		switch (g_eSave_Settings[SaveByWhat])
+		{
+			case NAME: Save_Data(id, g_iPlayerData[id][UserName])
+			case STEAMID: Save_Data(id, g_iPlayerData[id][UserAuthID])
+			case IP: Save_Data(id, g_iPlayerData[id][UserIP])
+		}
 		g_iPlayerData[id][ConnectStatus] = false
 	}
 }
 
 public client_infochanged(id)
 {
-	if (!is_user_connected(id))
+	if (!is_user_connected(id) || g_eSave_Settings[SaveByWhat] != NAME)
 		return PLUGIN_HANDLED
 	
 	enum _:eNameData
@@ -518,20 +573,23 @@ public eventDeathMsg()
 public RSH_SQL_Initialize()
 {
 	new ErrorCode
-	g_SqlTuple = SQL_MakeDbTuple(g_eSave_Settings[Host], g_eSave_Settings[User], g_eSave_Settings[Pass], g_eSave_Settings[Db])
+	g_SqlTuple = Handle:SQL_MakeDbTuple(g_eSave_Settings[Host], g_eSave_Settings[User], g_eSave_Settings[Pass], g_eSave_Settings[Db])
 	
 	new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
 	
 	if(SqlConnection == Empty_Handle)
-		set_fail_state(g_Error)
+	{
+		log_amx(g_Error)
+		g_eSave_Settings[SaveType] = FVAULT
+	}
 
 	new Handle:Queries = SQL_PrepareQuery(SqlConnection, "CREATE TABLE IF NOT EXISTS `%s`\
-	(`Name` VARCHAR(32) NOT NULL,\
+	(`%s` VARCHAR(32) NOT NULL,\
 	`Experience` INT(10) NOT NULL,\
 	`Level` INT(10) NOT NULL,\
 	`Played_Time` INT(10) NOT NULL,\
 	`Connections` INT(10) NOT NULL,\
-	PRIMARY KEY (Name));", g_eSave_Settings[Table])
+	PRIMARY KEY (%s));", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_eSave_Settings[SaveBy])
 	
 	if(!SQL_Execute(Queries))
 	{
@@ -559,7 +617,7 @@ public QueryHandler(FailState, Handle:Query, Error[], Errcode, Data[], DataSize)
 	return PLUGIN_HANDLED
 }
 
-public Save_Data(id, szName[])
+public Save_Data(id, szSaveBy[])
 {
 	static szData[MAX_FMT_LENGTH], szTemp[MAX_FMT_LENGTH * 2]
 	switch(g_eSave_Settings[SaveType])
@@ -567,22 +625,22 @@ public Save_Data(id, szName[])
 		case NVAULT:
 		{
 			formatex(szData, charsmax(szData), "%i#%i#%i#%i", g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections])
-			nvault_set(g_iNVault, szName, szData)
+			nvault_set(g_iNVault, szSaveBy, szData)
 		}
 		case FVAULT:
 		{
 			formatex(szData, charsmax(szData), "%i#%i#%i#%i", g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections])
-			fvault_set_data(g_eSave_Settings[FVault], szName, szData)
+			fvault_set_data(g_eSave_Settings[FVault], szSaveBy, szData)
 		}
 		case SQL:
 		{
-			format(szTemp, charsmax(szTemp), "UPDATE `%s` SET `Experience`='%i',`Level`='%i',`Played_Time`='%i',`Connections`='%i' WHERE `Name`='%s';", g_eSave_Settings[Table], g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections], szName)
+			format(szTemp, charsmax(szTemp), "UPDATE `%s` SET `Experience`='%i',`Level`='%i',`Played_Time`='%i',`Connections`='%i' WHERE `%s`='%s';", g_eSave_Settings[Table], g_iPlayerData[id][Experience], g_iPlayerData[id][Level], get_user_total_playtime(id), g_iPlayerData[id][Connections], g_eSave_Settings[SaveBy], szSaveBy)
 			SQL_ThreadQuery(g_SqlTuple, "QueryHandler", szTemp)
 		}
 	}
 }
 
-public Load_Data(szName[], id)
+public Load_Data(szSaveBy[], id)
 {
 	if (!is_user_connected(id))
 		return
@@ -594,7 +652,7 @@ public Load_Data(szName[], id)
 		case NVAULT:
 		{
 			new iTimeStamp
-			if (nvault_lookup(g_iNVault, szName, szData, charsmax(szData), iTimeStamp))
+			if (nvault_lookup(g_iNVault, szSaveBy, szData, charsmax(szData), iTimeStamp))
 			{
 				parse_loaded_data(id, szData, charsmax(szData))
 			}
@@ -605,7 +663,7 @@ public Load_Data(szName[], id)
 		}
 		case FVAULT:
 		{
-			if(fvault_get_data(g_eSave_Settings[FVault], szName, szData, charsmax(szData)))
+			if(fvault_get_data(g_eSave_Settings[FVault], szSaveBy, szData, charsmax(szData)))
 			{
 				parse_loaded_data(id, szData, charsmax(szData))
 			} 
@@ -619,15 +677,16 @@ public Load_Data(szName[], id)
 			new ErrorCode
 			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
 			
-			SQL_QuoteString(SqlConnection, szName, MAX_NAME_LENGTH, szName)
+			SQL_QuoteString(SqlConnection, szSaveBy, MAX_NAME_LENGTH, szSaveBy)
 			
 			if (SqlConnection == Empty_Handle)
 			{
 				log_amx(g_Error)
 				return
 			}
-			new Handle:Query = SQL_PrepareQuery(SqlConnection, "SELECT * FROM %s WHERE Name = '%s';", g_eSave_Settings[Table], szName)
-			
+
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, "SELECT * FROM %s WHERE %s = '%s';", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], szSaveBy)
+
 			if (!SQL_Execute(Query))
 			{
 				SQL_QueryError(Query, g_Error, charsmax(g_Error))
@@ -674,15 +733,29 @@ public parse_loaded_data(id, szData[], iLen)
 			new ErrorCode
 			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
 			
-			SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+			switch (g_eSave_Settings[SaveByWhat])
+			{
+				case NAME: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+				case STEAMID: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserAuthID], charsmax(g_iPlayerData[][UserAuthID]), g_iPlayerData[id][UserAuthID])
+				case IP: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserIP], charsmax(g_iPlayerData[][UserIP]), g_iPlayerData[id][UserIP])
+			}
 			
 			if (SqlConnection == Empty_Handle)
 			{
 				log_amx(g_Error)
 				return 
 			}
+
+			static szPreparedQueryFmt[MAX_FMT_LENGTH]
 			
-			new Handle:Query = SQL_PrepareQuery(SqlConnection, "SELECT Experience,Level,Played_Time,Connections FROM %s WHERE Name = '%s';", g_eSave_Settings[Table], g_iPlayerData[id][UserName])
+			switch (g_eSave_Settings[SaveByWhat])
+			{
+				case NAME: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "SELECT Experience,Level,Played_Time,Connections FROM %s WHERE %s = '%s';", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserName])
+				case STEAMID: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "SELECT Experience,Level,Played_Time,Connections FROM %s WHERE %s = '%s';", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserAuthID])
+				case IP: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "SELECT Experience,Level,Played_Time,Connections FROM %s WHERE %s = '%s';", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserIP])
+			}
+			
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, szPreparedQueryFmt)
 			
 			if (!SQL_Execute(Query))
 			{
@@ -725,16 +798,30 @@ public register_new_player(id)
 			new ErrorCode
 			new Handle:SqlConnection = SQL_Connect(g_SqlTuple, ErrorCode, g_Error, charsmax(g_Error))
 			
-			SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+			switch (g_eSave_Settings[SaveByWhat])
+			{
+				case NAME: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserName], charsmax(g_iPlayerData[][UserName]), g_iPlayerData[id][UserName])
+				case STEAMID: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserAuthID], charsmax(g_iPlayerData[][UserAuthID]), g_iPlayerData[id][UserAuthID])
+				case IP: SQL_QuoteString(SqlConnection, g_iPlayerData[id][UserIP], charsmax(g_iPlayerData[][UserIP]), g_iPlayerData[id][UserIP])
+			}
 			
 			if(SqlConnection == Empty_Handle)
 			{
 				log_amx(g_Error)
 				return 
 			}
+
+			static szPreparedQueryFmt[MAX_FMT_LENGTH]
 			
-			new Handle:Query = SQL_PrepareQuery(SqlConnection, "INSERT INTO %s (`Name`,`Experience`,`Level`,`Played_Time`,`Connections`) VALUES ('%s','0','0','0','1');", g_eSave_Settings[Table], g_iPlayerData[id][UserName])
-			
+			switch (g_eSave_Settings[SaveByWhat])
+			{
+				case NAME: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "INSERT INTO %s (`%s`,`Experience`,`Level`,`Played_Time`,`Connections`) VALUES ('%s','0','0','0','1');", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserName])
+				case STEAMID: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "INSERT INTO %s (`%s`,`Experience`,`Level`,`Played_Time`,`Connections`) VALUES ('%s','0','0','0','1');", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserAuthID])
+				case IP: formatex(szPreparedQueryFmt, charsmax(szPreparedQueryFmt), "INSERT INTO %s (`%s`,`Experience`,`Level`,`Played_Time`,`Connections`) VALUES ('%s','0','0','0','1');", g_eSave_Settings[Table], g_eSave_Settings[SaveBy], g_iPlayerData[id][UserIP])
+			}
+
+			new Handle:Query = SQL_PrepareQuery(SqlConnection, szPreparedQueryFmt)
+
 			if(!SQL_Execute(Query))
 			{
 				SQL_QueryError(Query, g_Error, charsmax(g_Error))
