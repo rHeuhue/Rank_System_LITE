@@ -340,6 +340,7 @@ public Read_Ranks_File()
 								g_eSave_Settings[LoadTime] = _:str_to_float(szValue)
 							else if (equal(szKey, "SAVE_BY"))
 							{
+								strtoupper(szValue)
 								copy(g_eSave_Settings[SaveBy], charsmax(g_eSave_Settings[SaveBy]), szValue)
 
 								if (equali(g_eSave_Settings[SaveBy], "NAME"))
