@@ -21,6 +21,7 @@ public plugin_init()
 	set_cvar_string(GAMETRACKER, AUTHOR)
 
 	register_clcmd("say /rankhud", "Command_ToggleRankHud")
+	register_clcmd("say_team /rankhud", "Command_ToggleRankHud")
 
 	g_SyncHudMessage = CreateHudSyncObj()
 
@@ -46,7 +47,7 @@ public Command_ToggleRankHud(id)
 	#if defined _cromchat_included
 	CC_SendMatched(id, CC_COLOR_GREY, "&x03You have successfully turned &x04%s &x03rank hud message!", g_bRankHudMessage[id] ? "on" : "off")
 	#else
-	client_print_color(id, print_team_grey, "&x03You have successfully turned &x04%s &x03rank hud message!", g_bRankHudMessage[id] ? "on" : "off")
+	client_print_color(id, print_team_grey, "^4* ^3You have successfully turned ^4%s ^3rank hud message!", g_bRankHudMessage[id] ? "on" : "off")
 	#endif
 	return PLUGIN_HANDLED
 }
