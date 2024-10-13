@@ -788,6 +788,8 @@ public parse_loaded_data(id, szData[], iLen)
 				g_iPlayerData[id][Played_Time] = SQL_ReadResult(Query, 2)
 				g_iPlayerData[id][Connections] = SQL_ReadResult(Query, 3)
 				g_iPlayerData[id][Connections]++
+
+				CheckRank(id, Positive, false)
 			}
 			SQL_FreeHandle(Query)
 			SQL_FreeHandle(SqlConnection)
