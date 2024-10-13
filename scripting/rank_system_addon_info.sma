@@ -40,6 +40,11 @@ public plugin_init()
 	#endif
 }
 
+public client_putinserver(id)
+{
+	g_bRankHudMessage[id] = true
+}
+
 public Command_ToggleRankHud(id)
 {
 	g_bRankHudMessage[id] = !g_bRankHudMessage[id]
