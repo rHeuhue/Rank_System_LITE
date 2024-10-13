@@ -107,7 +107,7 @@ public HudEntity(iEnt)
 
 public EventStatusValue(const id)
 {
-	static szMessage[34], iPlayer, iAux
+	static szMessage[MAX_FMT_LENGTH], iPlayer, iAux
 	get_user_aiming(id, iPlayer, iAux)
 	
 	if (is_user_alive(iPlayer))
@@ -119,9 +119,9 @@ public EventStatusValue(const id)
 		get_vip_flag(szFlag, charsmax(szFlag))
 
 		if (get_user_flags(iPlayer) & read_flags(szFlag))
-			formatex(szMessage, charsmax(szMessage), "1 VIP: %%p2 | Rank: %s | Experience: %s", szRankName, get_user_exp(iPlayer))
+			formatex(szMessage, charsmax(szMessage), "1 VIP: %%p2 | Rank: %s | Experience: %i", szRankName, get_user_exp(iPlayer))
 		else
-			formatex(szMessage, charsmax(szMessage), "1 PLAYER: %%p2 | Rank: %s | Experience: %s", szRankName, get_user_exp(iPlayer))
+			formatex(szMessage, charsmax(szMessage), "1 PLAYER: %%p2 | Rank: %s | Experience: %i", szRankName, get_user_exp(iPlayer))
 
 		message_begin(MSG_ONE_UNRELIABLE, get_user_msgid("StatusText") , _, id)
 		write_byte(0)
