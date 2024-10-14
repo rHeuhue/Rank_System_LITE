@@ -6,7 +6,7 @@
 #tryinclude <cromchat>
 
 #define PLUGIN  "Addon: Rank Information"
-#define VERSION "1.1"
+#define VERSION "1.2"
 #define AUTHOR  "Huehue @ AMXX-BG.INFO"
 #define GAMETRACKER "rank_system_info"
 
@@ -59,50 +59,70 @@ public Command_ToggleRankHud(id)
 
 public HudEntity(iEnt)
 {
-	static iPlayers[32], iNum, id, iLen
-	get_players(iPlayers, iNum, "ach")
+	static iPlayers[MAX_PLAYERS], iNum, id, iDeadId
+	get_players(iPlayers, iNum, "h")
 			
 	for (new i = 0; i < iNum; i++)
 	{
 		id = iPlayers[i]
+		iDeadId = id
 
 		if (g_bRankHudMessage[id])
 		{
-			new szRankName[2][64], szHudMessage[128], szTime[MAX_FMT_LENGTH]
-			get_user_rank_name(id, szRankName[0], charsmax(szRankName[]))
-			get_user_next_rank_name(id, szRankName[1], charsmax(szRankName[]))
-			get_user_sz_playtime(id, szTime, charsmax(szTime))
-					
-			iLen = formatex(szHudMessage, charsmax(szHudMessage), "Rank: %s^n", szRankName[0])
-					
-
-			if (get_user_level(id) > get_total_ranks()-1)
+			if (is_user_alive(id))
 			{
-				iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Experience: %i", get_user_exp(id))
+				UTIL_FormatHudMessage(id, id)
 			}
 			else
 			{
-				iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Experience: %i/%i^nNext Rank: %s",
-					get_user_exp(id), get_user_next_exp(id), szRankName[1])
+				iDeadId = pev(id, pev_iuser2)
+
+				if (iDeadId)
+				{
+					UTIL_FormatHudMessage(id, iDeadId)
+				}
 			}
-
-			iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "^nPlay Time: %s", szTime)
-
-			static szColors[12], szRed[6], szGreen[6], szBlue[6], iRed, iGreen, iBlue
-			get_hud_colors(szColors, charsmax(szColors))
-
-			parse(szColors, szRed, charsmax(szRed), szGreen, charsmax(szGreen), szBlue, charsmax(szBlue))
-
-			iRed = str_to_num(szRed)
-			iGreen = str_to_num(szGreen)
-			iBlue = str_to_num(szBlue)
-
-			set_hudmessage(iRed, iGreen, iBlue, get_hud_position_x(), get_hud_position_y(), get_hud_effect(), 0.8, 0.8)
-			ShowSyncHudMsg(id, g_SyncHudMessage, "%s", szHudMessage)
-		}
-				
+		}		
 	}
 	entity_set_float(iEnt, EV_FL_nextthink, get_gametime() + 0.6)
+}
+
+UTIL_FormatHudMessage(id, iDeadId)
+{
+	static iLen
+	new szRankName[2][64], szHudMessage[128], szTime[MAX_FMT_LENGTH]
+	get_user_rank_name(iDeadId, szRankName[0], charsmax(szRankName[]))
+	get_user_next_rank_name(iDeadId, szRankName[1], charsmax(szRankName[]))
+	get_user_sz_playtime(iDeadId, szTime, charsmax(szTime))
+					
+	iLen = formatex(szHudMessage, charsmax(szHudMessage), "Rank: %s^n", szRankName[0])
+					
+
+	if (get_user_level(iDeadId) > get_total_ranks()-1)
+	{
+		iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Level: %i^n", get_user_level(iDeadId), get_total_ranks() - 1)
+		iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Experience: %i", get_user_exp(iDeadId))
+	}
+	else
+	{
+		iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Level: %i/%i^n", get_user_level(iDeadId), get_total_ranks())
+		iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "Experience: %i/%i^nNext Rank: %s",
+				get_user_exp(iDeadId), get_user_next_exp(iDeadId), szRankName[1])
+	}
+
+	iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "^nPlay Time: %s", szTime)
+
+	static szColors[12], szRed[6], szGreen[6], szBlue[6], iRed, iGreen, iBlue
+	get_hud_colors(szColors, charsmax(szColors))
+
+	parse(szColors, szRed, charsmax(szRed), szGreen, charsmax(szGreen), szBlue, charsmax(szBlue))
+
+	iRed = str_to_num(szRed)
+	iGreen = str_to_num(szGreen)
+	iBlue = str_to_num(szBlue)
+
+	set_hudmessage(iRed, iGreen, iBlue, get_hud_position_x(), get_hud_position_y(), get_hud_effect(), 0.8, 0.8)
+	ShowSyncHudMsg(id, g_SyncHudMessage, "%s", szHudMessage)
 }
 
 public EventStatusValue(const id)

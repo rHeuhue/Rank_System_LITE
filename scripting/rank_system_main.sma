@@ -86,7 +86,9 @@ enum _:eSettings
 	VipHeadKillExp,
 	VipGrenadeKillExp,
 	VipKnifeKillExp,
-	VipFlagBit
+	VipFlagBit,
+	LevelUp_Sound[64],
+	LevelDown_Sound[64]
 }
 
 new g_eSettings[eSettings]
@@ -201,6 +203,8 @@ public Read_Ranks_File()
 				^nVIP_HEADSHOT_KILL_EXP = 5\
 				^nVIP_GRENADE_KILL_EXP = 6\
 				^nVIP_KNIFE_KILL_EXP = 8\
+				^n^nLEVEL_UP_SOUND = sound/ambience/lv_fruit2.wav\
+				^nLEVEL_DOWN_SOUND = sound/ambience/thunder_clap.wav\
 				^n^n[SAVE OPTIONS]\
 				^nHOST = YourHost\
 				^nUSER = YourUser\
@@ -301,6 +305,24 @@ public Read_Ranks_File()
 								g_eSettings[VipGrenadeKillExp] = str_to_num(szValue)
 							else if (equal(szKey, "VIP_KNIFE_KILL_EXP"))
 								g_eSettings[VipKnifeKillExp] = str_to_num(szValue)
+							else if (equal(szKey, "LEVEL_UP_SOUND"))
+							{
+								copy(g_eSettings[LevelUp_Sound], charsmax(g_eSettings[LevelUp_Sound]), szValue)
+
+								if (szValue[0])
+								{
+									try_precache_generic(szValue)
+								}
+							}
+							else if (equal(szKey, "LEVEL_DOWN_SOUND"))
+							{
+								copy(g_eSettings[LevelDown_Sound], charsmax(g_eSettings[LevelDown_Sound]), szValue)
+
+								if (szValue[0])
+								{
+									try_precache_generic(szValue)
+								}
+							}
 						}
 						case SECTION_SAVE_SETTINGS:
 						{
@@ -473,7 +495,7 @@ public Command_Reload_RanksFile(id, level, cid)
 	return PLUGIN_HANDLED
 }
 
-public CheckRank(id, iType, bool:bSendMessage)
+public CheckRank(id, iType, bool:bSendMessage, bool:bSendLevel_Sound)
 {
 	if(g_iPlayerData[id][Level] <= 0)
 	{
@@ -509,6 +531,11 @@ public CheckRank(id, iType, bool:bSendMessage)
 					client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has lost ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][NextLevel], szRankName)
 					#endif
 				}
+
+				if (bSendLevel_Sound)
+				{
+					client_cmd(id, "spk %s", g_eSettings[LevelDown_Sound])
+				}
 			}
 		}
 		case Positive:
@@ -533,6 +560,11 @@ public CheckRank(id, iType, bool:bSendMessage)
 					#else
 					client_print_color(0, print_team_grey, "^4* ^3Player ^4%s ^3has achieved ^4Level %i ^3- ^4%s", g_iPlayerData[id][UserName], g_iPlayerData[id][Level], szRankName)
 					#endif
+				}
+
+				if (bSendLevel_Sound)
+				{
+					client_cmd(id, "spk %s", g_eSettings[LevelUp_Sound])
 				}
 			}
 		}
@@ -576,7 +608,7 @@ public eventDeathMsg()
 
 		g_iPlayerData[iKiller][Experience] += g_iPlayerData[iKiller][IncreaseExperience]
 
-		CheckRank(iKiller, Positive, true)
+		CheckRank(iKiller, Positive, true, true)
 	}
 }
 
@@ -741,7 +773,7 @@ public parse_loaded_data(id, szData[], iLen)
 			g_iPlayerData[id][Connections] = str_to_num(szConnections)
 			g_iPlayerData[id][Connections]++
 
-			CheckRank(id, Positive, false)
+			CheckRank(id, Positive, false, false)
 		}
 		case SQL:
 		{
@@ -789,7 +821,7 @@ public parse_loaded_data(id, szData[], iLen)
 				g_iPlayerData[id][Connections] = SQL_ReadResult(Query, 3)
 				g_iPlayerData[id][Connections]++
 
-				CheckRank(id, Positive, false)
+				CheckRank(id, Positive, false, false)
 			}
 			SQL_FreeHandle(Query)
 			SQL_FreeHandle(SqlConnection)
@@ -911,12 +943,12 @@ public native_set_user_level(iPlugin, iParams)
 	if (g_iPlayerData[id][Level] < iLevel)
 	{
 		g_iPlayerData[id][Level] = iLevel
-		CheckRank(id, Positive, true)
+		CheckRank(id, Positive, true, true)
 	}
 	else
 	{
 		g_iPlayerData[id][Level] = iLevel
-		CheckRank(id, Negative, true)
+		CheckRank(id, Negative, true, true)
 	}
 	return true
 	
@@ -940,12 +972,12 @@ public native_set_user_exp(iPlugin, iParams)
 	if (g_iPlayerData[id][Experience] < iExp)
 	{
 		g_iPlayerData[id][Experience] = iExp
-		CheckRank(id, Positive, true)
+		CheckRank(id, Positive, true, true)
 	}
 	else
 	{
 		g_iPlayerData[id][Experience] = iExp
-		CheckRank(id, Negative, true)
+		CheckRank(id, Negative, true, true)
 	}
 	return true
 	
@@ -1043,7 +1075,7 @@ public native_update_rank_info(iPlugin, iParams)
 	if (!is_user_connected(id))
 		return false
 
-	CheckRank(id, iType, true)
+	CheckRank(id, iType, true, true)
 	return true
 }
 
@@ -1137,4 +1169,37 @@ public native_get_user_sz_playetime(iPlugin, iParams)
 stock get_user_total_playtime(id)
 {
 	return g_iPlayerData[id][Played_Time] + get_user_time(id)
+}
+
+stock try_precache_generic(const szGeneric[])
+{
+	if (containi(szGeneric, "sound/") == -1)
+	{
+		new szGenericSoundFix[64]
+		format(szGenericSoundFix, charsmax(szGenericSoundFix), "sound/%s", szGeneric)
+
+		if (file_exists(szGenericSoundFix))
+		{
+			precache_generic(szGenericSoundFix)
+			return true
+		}
+		else
+		{
+			log_amx("Failed to precache generic ^"%s^"", szGenericSoundFix)
+			return false
+		}
+	}
+	else
+	{
+		if (file_exists(szGeneric))
+		{
+			precache_generic(szGeneric)
+			return true
+		}
+		else
+		{
+			log_amx("Failed to precache generic ^"%s^"", szGeneric)
+			return false
+		}
+	}
 }
