@@ -1,16 +1,33 @@
 #include <amxmodx>
+#include <amxmisc>
 
 /* Common include libraries */
-#include <engine>
 #include <rank_system_huehue>
 #tryinclude <cromchat>
 
 #define PLUGIN  "Addon: Rank Information"
-#define VERSION "1.2"
+#define VERSION "1.3"
 #define AUTHOR  "Huehue @ AMXX-BG.INFO"
 #define GAMETRACKER "rank_system_info"
 
+#define RSH_TASKID	1030
+
+// Uncomment to show in hud player total play time
+//#define SHOW_PLAYTIME
+
 new g_SyncHudMessage
+
+enum _:eHudData
+{
+	Red,
+	Green,
+	Blue,
+	Float:X_Coord,
+	Float:Y_Coord,
+	Effect
+}
+
+new g_iHudSettings[eHudData]
 
 new bool:g_bRankHudMessage[MAX_PLAYERS + 1] = {true, ...}
 
@@ -25,12 +42,6 @@ public plugin_init()
 
 	g_SyncHudMessage = CreateHudSyncObj()
 
-	new iEnt = create_entity("info_target")
-	entity_set_string(iEnt, EV_SZ_classname, "task_entity")
-										
-	register_think("task_entity", "HudEntity")
-	entity_set_float(iEnt, EV_FL_nextthink, get_gametime() + 1.0)
-
 	register_event("StatusValue", "EventStatusValue", "b", "1>0", "2>0")
 
 	#if defined _cromchat_included
@@ -40,9 +51,26 @@ public plugin_init()
 	#endif
 }
 
+public plugin_cfg()
+{
+	static szColors[12], szRed[6], szGreen[6], szBlue[6]
+	get_hud_colors(szColors, charsmax(szColors))
+
+	parse(szColors, szRed, charsmax(szRed), szGreen, charsmax(szGreen), szBlue, charsmax(szBlue))
+
+	g_iHudSettings[Red] = str_to_num(szRed)
+	g_iHudSettings[Green] = str_to_num(szGreen)
+	g_iHudSettings[Blue] = str_to_num(szBlue)
+	g_iHudSettings[X_Coord] = get_hud_position_x()
+	g_iHudSettings[Y_Coord] = get_hud_position_y()
+	g_iHudSettings[Effect] = get_hud_effect()
+}
+
 public client_putinserver(id)
 {
 	g_bRankHudMessage[id] = true
+
+	set_task_ex(1.0, "Display_RankHud_Info", id + RSH_TASKID, .flags = SetTask_Repeat)
 }
 
 public Command_ToggleRankHud(id)
@@ -57,43 +85,35 @@ public Command_ToggleRankHud(id)
 	return PLUGIN_HANDLED
 }
 
-public HudEntity(iEnt)
+public Display_RankHud_Info(id)
 {
-	static iPlayers[MAX_PLAYERS], iNum, id, iDeadId
-	get_players(iPlayers, iNum, "h")
-			
-	for (new i = 0; i < iNum; i++)
+	id -= RSH_TASKID
+
+	if (!g_bRankHudMessage[id])
+		return
+
+	static iDeadId
+	iDeadId = id
+
+	if (is_user_alive(id))
 	{
-		id = iPlayers[i]
-		iDeadId = id
-
-		if (g_bRankHudMessage[id])
-		{
-			if (is_user_alive(id))
-			{
-				UTIL_FormatHudMessage(id, id)
-			}
-			else
-			{
-				iDeadId = pev(id, pev_iuser2)
-
-				if (iDeadId)
-				{
-					UTIL_FormatHudMessage(id, iDeadId)
-				}
-			}
-		}		
+		UTIL_FormatHudMessage(id, id)
 	}
-	entity_set_float(iEnt, EV_FL_nextthink, get_gametime() + 0.6)
+	else
+	{
+		iDeadId = pev(id, pev_iuser2)
+
+		if (iDeadId)
+			UTIL_FormatHudMessage(id, iDeadId)
+	}
 }
 
 UTIL_FormatHudMessage(id, iDeadId)
 {
 	static iLen
-	new szRankName[2][64], szHudMessage[128], szTime[MAX_FMT_LENGTH]
+	new szRankName[2][64], szHudMessage[128]
 	get_user_rank_name(iDeadId, szRankName[0], charsmax(szRankName[]))
 	get_user_next_rank_name(iDeadId, szRankName[1], charsmax(szRankName[]))
-	get_user_sz_playtime(iDeadId, szTime, charsmax(szTime))
 					
 	iLen = formatex(szHudMessage, charsmax(szHudMessage), "Rank: %s^n", szRankName[0])
 					
@@ -110,18 +130,13 @@ UTIL_FormatHudMessage(id, iDeadId)
 				get_user_exp(iDeadId), get_user_next_exp(iDeadId), szRankName[1])
 	}
 
+	#if defined SHOW_PLAYTIME
+	new szTime[MAX_FMT_LENGTH]
+	get_user_sz_playtime(iDeadId, szTime, charsmax(szTime))
 	iLen += formatex(szHudMessage[iLen], charsmax(szHudMessage) - iLen, "^nPlay Time: %s", szTime)
+	#endif
 
-	static szColors[12], szRed[6], szGreen[6], szBlue[6], iRed, iGreen, iBlue
-	get_hud_colors(szColors, charsmax(szColors))
-
-	parse(szColors, szRed, charsmax(szRed), szGreen, charsmax(szGreen), szBlue, charsmax(szBlue))
-
-	iRed = str_to_num(szRed)
-	iGreen = str_to_num(szGreen)
-	iBlue = str_to_num(szBlue)
-
-	set_hudmessage(iRed, iGreen, iBlue, get_hud_position_x(), get_hud_position_y(), get_hud_effect(), 0.8, 0.8)
+	set_hudmessage(g_iHudSettings[Red], g_iHudSettings[Green], g_iHudSettings[Blue], g_iHudSettings[X_Coord], g_iHudSettings[Y_Coord], g_iHudSettings[Effect], 0.9, 0.9)
 	ShowSyncHudMsg(id, g_SyncHudMessage, "%s", szHudMessage)
 }
 
