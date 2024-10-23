@@ -92,20 +92,20 @@ public Display_RankHud_Info(id)
 	if (!g_bRankHudMessage[id])
 		return
 
-	static iDeadId
-	iDeadId = id
+	//static iDeadId
+	//iDeadId = id
 
 	if (is_user_alive(id))
 	{
 		UTIL_FormatHudMessage(id, id)
 	}
-	else
+	/*else
 	{
 		iDeadId = pev(id, pev_iuser2)
 
 		if (iDeadId)
 			UTIL_FormatHudMessage(id, iDeadId)
-	}
+	}*/
 }
 
 UTIL_FormatHudMessage(id, iDeadId)
