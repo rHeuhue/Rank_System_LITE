@@ -42,7 +42,7 @@ public plugin_init()
 
 	g_SyncHudMessage = CreateHudSyncObj()
 
-	register_event("StatusValue", "EventStatusValue", "b", "1>0", "2>0")
+	//register_event("StatusValue", "EventStatusValue", "b", "1>0", "2>0")
 
 	#if defined _cromchat_included
 	new szPrefix[32]
@@ -139,7 +139,7 @@ UTIL_FormatHudMessage(id, iDeadId)
 	set_hudmessage(g_iHudSettings[Red], g_iHudSettings[Green], g_iHudSettings[Blue], g_iHudSettings[X_Coord], g_iHudSettings[Y_Coord], g_iHudSettings[Effect], 0.9, 0.9)
 	ShowSyncHudMsg(id, g_SyncHudMessage, "%s", szHudMessage)
 }
-
+/*
 public EventStatusValue(const id)
 {
 	static szMessage[MAX_FMT_LENGTH], iPlayer, iAux
@@ -164,3 +164,4 @@ public EventStatusValue(const id)
 		message_end()
 	}
 }
+*/
